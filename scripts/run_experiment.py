@@ -18,13 +18,11 @@ OUTPUT: Satu CSV file berisi semua hasil fase 1 & 2 untuk 1-4 processes dengan 2
 PLOTTING: 5 grafik terpisah dari data tersebut (mendukung 1-4 processes, dengan hybrid di phase 2 graphs)
 """
 import subprocess
-import numpy as np
 import csv
 import os
 import shutil
 import sys
 from datetime import datetime
-import time as time_module
 
 class TerminalFormatter:
     """Format terminal output cleanly and readable"""
@@ -110,14 +108,6 @@ def run_experiment(program_path, num_procs, matrix_size, timeout_sec=120):
         return None, f"TIMEOUT after {timeout_sec}s"
     except Exception as e:
         return None, str(e)
-
-
-def calculate_matrix_size_for_weak_scaling(base_size, process_count):
-    """
-    Calculate matrix size for weak scaling
-    Maintain constant Problem Size per process: (size/p)² work per process
-    """
-    return int(base_size * np.sqrt(process_count))
 
 
 def phase1_gap_analysis():
