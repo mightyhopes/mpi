@@ -1,7 +1,7 @@
 """
-Standard Matrix Multiplication with MPI (Pure Python - TRUE BASELINE)
-Uses triple nested loop without vectorization
-Much slower than optimized np.dot() - demonstrates communication vs computation tradeoff
+Standard Matrix Multiplication with MPI (Vectorized Baseline)
+Uses np.dot() for computation while maintaining standard communication
+Significantly faster than triple nested loop
 """
 import os
 import numpy as np
@@ -19,10 +19,8 @@ except Exception as e:
 
 def matrix_multiply_standard(A, B, rank, size, comm):
     """
-    TRULY STANDARD approach: Pure Python triple nested loop
-    - NO vectorization (no np.dot)
-    - NO optimization
-    - This is the BASELINE to compare against
+    STANDARD approach with Vectorized Computation:
+    - Uses NumPy vectorization (np.dot)
     - Communication: Full B matrix broadcast to all processes
     """
     n = A.shape[0]
@@ -36,17 +34,8 @@ def matrix_multiply_standard(A, B, rank, size, comm):
     
     broadcast_B = comm.bcast(B, root=0)
     
-    rows, cols = local_A.shape
-    b_cols = broadcast_B.shape[1]
-    local_C = np.zeros((rows, b_cols), dtype=np.float32)
-    
-    # Triple nested loop without any optimization
-    for i in range(rows):
-        for j in range(b_cols):
-            sum_val = 0.0
-            for k in range(local_A.shape[1]):
-                sum_val += local_A[i, k] * broadcast_B[k, j]
-            local_C[i, j] = sum_val
+    # Optimized with NumPy vectorization (np.dot)
+    local_C = np.dot(local_A, broadcast_B)
     
     # Gather results
     C = None
@@ -95,7 +84,7 @@ def main():
     
     if rank == 0:
         elapsed_time = end_time - start_time
-        print(f"Standard (Pure Python) - Processes: {size}, Matrix: {n}x{n}, Time: {elapsed_time:.4f}s")
+        print(f"Standard (Vectorized) - Processes: {size}, Matrix: {n}x{n}, Time: {elapsed_time:.4f}s")
         
         # Optional: Verify correctness (expensive for large matrices)
         if n <= 512:
