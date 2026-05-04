@@ -31,7 +31,7 @@ except Exception as e:
     sys.exit(1)
 
 
-def matrix_multiply_hybrid(A, B, rank, size, comm):
+def matrix_multiply_hybrid(A, B, n, rank, size, comm):
     """
     HYBRID BLOCK-BASED approach - Intermediate optimization
     
@@ -44,7 +44,6 @@ def matrix_multiply_hybrid(A, B, rank, size, comm):
     Communication Cost: O(n²/√p) + O(n²) for B
     Better than Standard O(n²), but more overhead than Optimized O(n²/p)
     """
-    n = A.shape[0]
     
     # Calculate block size adaptively
     # For 2 procs on 512x512: block_size=512 (similar to scatterv)
@@ -75,8 +74,14 @@ def matrix_multiply_hybrid(A, B, rank, size, comm):
         root=0
     )
     
-    # Broadcast B (still necessary for computation)
-    B_local = comm.bcast(B, root=0)
+    # Broadcast B (all processes need the full B matrix)
+    # Optimized: Use comm.Bcast (capital B) with pre-allocated buffer
+    if rank != 0:
+        B_local = np.empty((n, n), dtype=np.float32)
+    else:
+        B_local = B
+
+    comm.Bcast(B_local, root=0)
     
     # Local block computation using NumPy (like optimized)
     # This is where computation happens on the received block
@@ -119,15 +124,15 @@ def main():
         A = None
         B = None
     
-    # Broadcast matrices from rank 0
-    A = comm.bcast(A, root=0)
-    B = comm.bcast(B, root=0)
+    # Redundant broadcasts of A and B removed to save communication overhead
+    # A is distributed via Scatterv inside matrix_multiply_hybrid
+    # B is broadcast inside matrix_multiply_hybrid
     
     # Synchronize and measure
     comm.Barrier()
     start_time = MPI.Wtime()
     
-    C = matrix_multiply_hybrid(A, B, rank, size, comm)
+    C = matrix_multiply_hybrid(A, B, n, rank, size, comm)
     
     comm.Barrier()
     end_time = MPI.Wtime()

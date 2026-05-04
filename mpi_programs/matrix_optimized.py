@@ -21,7 +21,7 @@ except Exception as e:
     sys.exit(1)
 
 
-def matrix_multiply_optimized(A, B, rank, size, comm):
+def matrix_multiply_optimized(A, B, n, rank, size, comm):
     """
     OPTIMIZED approach with COMMUNICATION STRATEGY:
     
@@ -34,7 +34,6 @@ def matrix_multiply_optimized(A, B, rank, size, comm):
     - Optimized: Each process gets only its needed rows (n²/p floats)
     - Result: Reduced communication overhead by ~50-70% for 2 processes
     """
-    n = A.shape[0]
     rows_per_process = n // size
     
     # Only send required rows to each process instead of broadcasting all
@@ -59,7 +58,13 @@ def matrix_multiply_optimized(A, B, rank, size, comm):
     )
     
     # All processes need full B for their local computation
-    B_local = comm.bcast(B, root=0)
+    # Optimized: Use comm.Bcast (capital B) with pre-allocated buffer
+    if rank != 0:
+        B_local = np.empty((n, n), dtype=np.float32)
+    else:
+        B_local = B
+
+    comm.Bcast(B_local, root=0)
     
     # This is where optimization impact is MAXIMUM
     # For 512x512 matrix: ~256 million operations (vectorized in BLAS)
@@ -103,15 +108,15 @@ def main():
         A = None
         B = None
     
-    # Initial broadcast (necessary for scatterv to work)
-    A = comm.bcast(A, root=0)
-    B = comm.bcast(B, root=0)
+    # Redundant broadcasts of A and B removed to save communication overhead
+    # A is distributed via Scatterv inside matrix_multiply_optimized
+    # B is broadcast inside matrix_multiply_optimized
     
     # Synchronize before timing
     comm.Barrier()
     start_time = MPI.Wtime()
     
-    C = matrix_multiply_optimized(A, B, rank, size, comm)
+    C = matrix_multiply_optimized(A, B, n, rank, size, comm)
     
     comm.Barrier()
     end_time = MPI.Wtime()
