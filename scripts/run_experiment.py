@@ -78,10 +78,27 @@ def run_experiment(program_path, num_procs, matrix_size, timeout_sec=120):
     Returns: (execution_time, output_text) or (None, None) on failure
     """
     try:
-        prog = os.path.normpath(program_path)
+        # 1. Input Validation
+        # Validate num_procs and matrix_size
+        if not (isinstance(num_procs, (int, str)) and str(num_procs).isdigit() and int(num_procs) > 0):
+            return None, f"Invalid num_procs: {num_procs}"
+        if not (isinstance(matrix_size, (int, str)) and str(matrix_size).isdigit() and int(matrix_size) > 0):
+            return None, f"Invalid matrix_size: {matrix_size}"
+
+        # 2. Path Validation (Secure Path Handling)
+        # Ensure program_path is within mpi_programs/ directory
+        prog = os.path.realpath(os.path.normpath(program_path))
+        base_dir = os.path.realpath("mpi_programs")
+
+        if os.path.commonpath([prog, base_dir]) != base_dir:
+            return None, f"Security Violation: Path {program_path} is outside allowed directory"
+
+        if not os.path.isfile(prog):
+            return None, f"File not found: {prog}"
+
         mpi_cmd, mpi_flag = get_mpi_launcher()
         
-        # Build command
+        # Build command (using list format is preferred over string for security)
         if mpi_cmd and int(num_procs) > 1:
             cmd = [mpi_cmd, mpi_flag, str(num_procs), sys.executable, prog]
         else:
@@ -89,12 +106,13 @@ def run_experiment(program_path, num_procs, matrix_size, timeout_sec=120):
         
         cmd += ["--test-n", str(matrix_size)]
         
-        # Run with timeout
+        # Run with timeout and explicit shell=False
         result = subprocess.run(
             cmd, 
             capture_output=True, 
             text=True, 
-            timeout=timeout_sec
+            timeout=timeout_sec,
+            shell=False
         )
         
         # Parse output
