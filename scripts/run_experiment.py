@@ -24,7 +24,6 @@ import os
 import shutil
 import sys
 from datetime import datetime
-import time as time_module
 
 class TerminalFormatter:
     """Format terminal output cleanly and readable"""
