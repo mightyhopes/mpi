@@ -49,8 +49,13 @@ def matrix_multiply_hybrid(A, B, rank, size, comm):
     # Calculate block size adaptively
     # For 2 procs on 512x512: block_size=512 (similar to scatterv)
     # This is essentially row-based for 2 procs, but conceptually different
-    block_size = n // size
-    rows_per_process = block_size * size // size
+    rows_counts = [n // size] * size
+    for i in range(n % size):
+        rows_counts[i] += 1
+
+    rows_per_process = rows_counts[rank]
+    sendcounts = [rc * n for rc in rows_counts]
+    displacements = [sum(sendcounts[:i]) for i in range(size)]
     
     # Hybrid approach: Use partial blocking factor
     # Instead of scattering individual rows, scatter logical blocks
@@ -58,12 +63,8 @@ def matrix_multiply_hybrid(A, B, rank, size, comm):
     
     if rank == 0:
         A_scattered = A
-        sendcounts = [rows_per_process * n] * size
-        displacements = [i * rows_per_process * n for i in range(size)]
     else:
         A_scattered = None
-        sendcounts = None
-        displacements = None
     
     # Allocate buffer for this process's block
     local_A = np.zeros((rows_per_process, n), dtype=np.float32)

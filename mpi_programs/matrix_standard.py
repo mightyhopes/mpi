@@ -28,9 +28,11 @@ def matrix_multiply_standard(A, B, rank, size, comm):
     n = A.shape[0]
     
     # Distribute rows of A to each process
-    rows_per_process = n // size
-    start_row = rank * rows_per_process
-    end_row = start_row + rows_per_process
+    rows_counts = [n // size] * size
+    for i in range(n % size):
+        rows_counts[i] += 1
+    start_row = sum(rows_counts[:rank])
+    end_row = start_row + rows_counts[rank]
     
     local_A = A[start_row:end_row, :]
     
@@ -53,9 +55,12 @@ def matrix_multiply_standard(A, B, rank, size, comm):
     if rank == 0:
         C = np.zeros((n, n), dtype=np.float32)
     
+    sendcounts = [rc * n for rc in rows_counts]
+    displacements = [sum(sendcounts[:i]) for i in range(size)]
+
     comm.Gatherv(
         [local_C, MPI.FLOAT],
-        [C, ([rows_per_process * n] * size, [i * rows_per_process * n for i in range(size)]), MPI.FLOAT] if rank == 0 else None,
+        [C, (sendcounts, displacements), MPI.FLOAT] if rank == 0 else None,
         root=0
     )
     

@@ -35,18 +35,21 @@ def matrix_multiply_optimized(A, B, rank, size, comm):
     - Result: Reduced communication overhead by ~50-70% for 2 processes
     """
     n = A.shape[0]
-    rows_per_process = n // size
+
+    rows_counts = [n // size] * size
+    for i in range(n % size):
+        rows_counts[i] += 1
+
+    sendcounts = [rc * n for rc in rows_counts]
+    displacements = [sum(sendcounts[:i]) for i in range(size)]
+    rows_per_process = rows_counts[rank]
     
     # Only send required rows to each process instead of broadcasting all
     if rank == 0:
         # Create send buffers with proper layout for Scatterv
         A_scattered = A  # Will be scattered row-wise
-        sendcounts = [rows_per_process * n] * size
-        displacements = [i * rows_per_process * n for i in range(size)]
     else:
         A_scattered = None
-        sendcounts = None
-        displacements = None
     
     # Allocate local buffer for scattered data
     local_A = np.zeros((rows_per_process, n), dtype=np.float32)
