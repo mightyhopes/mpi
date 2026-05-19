@@ -106,8 +106,14 @@ def run_experiment(program_path, num_procs, matrix_size, timeout_sec=120):
             
     except subprocess.TimeoutExpired:
         return None, f"TIMEOUT after {timeout_sec}s"
+    except (OSError, subprocess.SubprocessError) as e:
+        # Log specific system/subprocess errors to stderr
+        print(TerminalFormatter.error(f"System error: {e}"), file=sys.stderr)
+        return None, "System error during execution"
     except Exception as e:
-        return None, str(e)
+        # Securely log unexpected errors and return a generic message
+        print(TerminalFormatter.error(f"Unexpected error: {e}"), file=sys.stderr)
+        return None, "Internal execution error"
 
 
 def phase1_gap_analysis():
